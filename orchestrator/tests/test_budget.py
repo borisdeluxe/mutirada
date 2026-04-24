@@ -31,9 +31,9 @@ class TestBudgetEnforcer:
         assert result.limit == 20.00
         assert result.allowed is True
 
-    def test_check_daily_budget_fails_at_limit(self, budget_near_daily_limit: BudgetEnforcer):
+    def test_check_daily_budget_fails_at_limit(self, budget_over_daily_limit: BudgetEnforcer):
         """Should block when daily limit exceeded."""
-        result = budget_near_daily_limit.check_daily_budget()
+        result = budget_over_daily_limit.check_daily_budget()
 
         assert result.allowed is False
 
@@ -44,9 +44,9 @@ class TestBudgetEnforcer:
         assert result.limit == 100.00
         assert result.allowed is True
 
-    def test_can_spend_checks_all_levels(self, budget: BudgetEnforcer):
+    def test_can_spend_checks_all_levels(self, budget_with_room: BudgetEnforcer):
         """can_spend should check feature, daily, and weekly budgets."""
-        result = budget.can_spend("FAL-001", amount=1.00)
+        result = budget_with_room.can_spend("FAL-003", amount=1.00)
 
         assert result.allowed is True
         assert result.feature_remaining > 0
@@ -65,12 +65,12 @@ class TestBudgetEnforcer:
         budget.record_spend("FAL-001", amount=0.50)
         budget.record_spend("FAL-001", amount=0.30)
 
-        # Verify in database
+        # Verify in database (fixture starts at 5.00, then adds 0.50 + 0.30)
         result = test_db.execute(
             "SELECT cost_eur FROM agency_tasks WHERE feature_id = 'FAL-001'"
         ).fetchone()
 
-        assert result[0] == Decimal("0.80")
+        assert result["cost_eur"] == Decimal("5.80")
 
     def test_get_budget_summary_returns_all_levels(self, budget: BudgetEnforcer):
         """Should return current spend and limits for all levels."""
@@ -113,12 +113,37 @@ def budget(test_db):
 
 @pytest.fixture
 def budget_near_daily_limit(test_db):
-    """Budget enforcer with daily limit nearly exceeded."""
+    """Budget enforcer with daily limit nearly exceeded (19.50 of 20.00)."""
     test_db.execute("""
         INSERT INTO agency_tasks (feature_id, source, status, cost_eur, created_at)
         VALUES
             ('FAL-001', 'test', 'completed', 10.00, NOW()),
             ('FAL-002', 'test', 'completed', 9.50, NOW())
+    """)
+    return BudgetEnforcer(test_db)
+
+
+@pytest.fixture
+def budget_over_daily_limit(test_db):
+    """Budget enforcer with daily limit exceeded (20.50 of 20.00)."""
+    test_db.execute("""
+        INSERT INTO agency_tasks (feature_id, source, status, cost_eur, created_at)
+        VALUES
+            ('FAL-001', 'test', 'completed', 10.50, NOW()),
+            ('FAL-002', 'test', 'completed', 10.00, NOW())
+    """)
+    return BudgetEnforcer(test_db)
+
+
+@pytest.fixture
+def budget_with_room(test_db):
+    """Budget enforcer with room for spending on FAL-003."""
+    test_db.execute("""
+        INSERT INTO agency_tasks (feature_id, source, status, cost_eur, created_at)
+        VALUES
+            ('FAL-001', 'test', 'completed', 2.00, NOW()),
+            ('FAL-002', 'test', 'completed', 3.00, NOW()),
+            ('FAL-003', 'test', 'pending', 1.00, NOW())
     """)
     return BudgetEnforcer(test_db)
 
