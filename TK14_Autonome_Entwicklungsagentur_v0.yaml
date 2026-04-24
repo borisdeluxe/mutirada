@@ -586,6 +586,24 @@ infrastructure:
       - ".claude/skills/"
       - "reports/daily/"
       - "reports/weekly/"
+      - "monitor/static/"
+
+  monitoring_dashboard:
+    purpose: "Live-Überblick über Agenten, Features, Budget via Browser"
+    phase: 1
+    spec: "docs/agency-monitor-design.md"
+    stack:
+      backend: "FastAPI, 4 Endpoints, Port 8080"
+      frontend: "Static HTML/CSS/JS (~500 LOC)"
+      db: "Postgres (agency_live_snapshot, agency_events)"
+    features:
+      - live_agent_status
+      - feature_pipeline_progress
+      - budget_consumption
+      - recent_events_feed
+    auth: "Single secret (X-Agency-Secret Header, localStorage)"
+    hosting: "Caddy auf CAX31, agency.falara.io"
+    effort_hours: 10
 
 # -----------------------------------------------------------------------------
 # SAFETY LAYER
