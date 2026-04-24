@@ -85,17 +85,17 @@ class TestBudgetEnforcer:
 class TestBudgetLimits:
     """Budget limits should match TK14 specification."""
 
-    def test_default_feature_limit(self, budget: BudgetEnforcer):
+    def test_default_feature_limit(self, budget_limits_only: BudgetEnforcer):
         """Feature limit should be €5.00."""
-        assert budget.limits.per_feature_eur == 5.00
+        assert budget_limits_only.limits.per_feature_eur == 5.00
 
-    def test_default_daily_limit(self, budget: BudgetEnforcer):
+    def test_default_daily_limit(self, budget_limits_only: BudgetEnforcer):
         """Daily limit should be €20.00."""
-        assert budget.limits.per_day_eur == 20.00
+        assert budget_limits_only.limits.per_day_eur == 20.00
 
-    def test_default_weekly_limit(self, budget: BudgetEnforcer):
+    def test_default_weekly_limit(self, budget_limits_only: BudgetEnforcer):
         """Weekly limit should be €100.00."""
-        assert budget.limits.per_week_eur == 100.00
+        assert budget_limits_only.limits.per_week_eur == 100.00
 
 
 @pytest.fixture
@@ -121,3 +121,9 @@ def budget_near_daily_limit(test_db):
             ('FAL-002', 'test', 'completed', 9.50, NOW())
     """)
     return BudgetEnforcer(test_db)
+
+
+@pytest.fixture
+def budget_limits_only(mock_db):
+    """Budget enforcer for testing limits only (no DB operations)."""
+    return BudgetEnforcer(mock_db)

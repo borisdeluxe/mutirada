@@ -132,6 +132,6 @@ class TestRetryTracking:
 
 
 @pytest.fixture
-def gate(test_db):
+def gate(mock_db):
     """Gate validator instance."""
-    return GateValidator(test_db)
+    return GateValidator(mock_db)
