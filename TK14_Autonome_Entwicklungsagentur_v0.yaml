@@ -1,0 +1,662 @@
+# =============================================================================
+# TK14 – Autonome Entwicklungsagentur für falara.io
+# =============================================================================
+# Dokumenttyp:    Brainstorming / Erstes Konzept (v0)
+# Status:         DRAFT – noch nicht mit CLAUDE.md / userMemories abgeglichen
+# Zweck:          Eingabedokument für Claude Code zur Ausarbeitung in TK14 v1
+# Autor:          Boris (diktiert), Claude (strukturiert)
+# Datum:          2026-04-24
+# =============================================================================
+
+meta:
+  document_id: TK14
+  version: "0.1-brainstorm"
+  status: draft
+  title: "Autonome Entwicklungsagentur für falara.io"
+  language: de
+  successor_target: "TK14_Autonome_Entwicklungsagentur_v1.docx"
+  next_step: |
+    Claude Code soll dieses Konzept gegen CLAUDE.md (Repo-Root),
+    userMemories und bestehende TK-Dokumente (insb. TK1, TK5, Skalierungs-
+    Roadmap) abgleichen, Konflikte explizit aufzeigen, offene Entscheidungen
+    zusammen mit Boris klären und anschließend zu einem finalen TK14 v1
+    ausarbeiten (Format: .docx, analog zu bestehenden TK-Dokumenten).
+  non_goals:
+    - Ersetzt NICHT die Produkt-Pipeline (Agent 0–3 in TK1)
+    - Ändert NICHT die Falara-Produktarchitektur
+    - Betrifft AUSSCHLIESSLICH den Software-Entwicklungsprozess
+
+# -----------------------------------------------------------------------------
+# PROJEKTKONTEXT
+# -----------------------------------------------------------------------------
+project_context:
+  refers_to: falara.io
+  scope: development_pipeline_automation
+  current_state_reference:
+    - "Conductor (Melty Labs) für parallele Claude Code Agents in Worktrees"
+    - "Claude Code mit --dangerously-skip-permissions"
+    - "progress.md als Kontinuitäts-Artefakt pro Session"
+    - "TK-Dokumente als formale Handoff-Artefakte (TK1–TK13)"
+  pain_points:
+    - "Jeder Agent muss pro Session neu angelernt werden"
+    - "Kein Kontextwissen persistent pro Rolle"
+    - "Keine Gewaltenteilung zwischen Implementation und Deployment"
+    - "Keine strukturierte Beobachtung / Optimierung der Pipeline"
+    - "Sequenzielle Abarbeitung statt parallelisierbarer Rollen"
+
+# -----------------------------------------------------------------------------
+# AUTONOMIE-STUFEN
+# -----------------------------------------------------------------------------
+autonomy:
+  target_level: L3
+  start_level: L2
+  upgrade_path: "L2 → L3 nach 2–4 Wochen Stabilität, L4 nur bei belegbarer L3-Qualität"
+  excluded: L5
+  levels:
+    L1:
+      description: "Pipeline läuft, jedes Gate manuell"
+      status: ist_zustand
+    L2:
+      description: "Pipeline autonom bis PR, Merge manuell"
+      status: startziel
+    L3:
+      description: "Autonom bis Staging-Deploy, Prod-Deploy manuell"
+      status: hauptziel
+    L4:
+      description: "Autonom bis Prod mit Time-Lock + Auto-Rollback"
+      status: optional_später
+    L5:
+      description: "Optimizer ändert Agenten-Prompts selbst ohne Review"
+      status: ausgeschlossen
+      reason: "Drift-Risiko, keine deterministische Qualitätssicherung"
+
+# -----------------------------------------------------------------------------
+# ARCHITEKTUR – SCHICHTEN
+# -----------------------------------------------------------------------------
+architecture:
+  guiding_principle: |
+    Spezialisierte Agenten mit persistenter Rolle und eingeschränktem
+    Kontext. Jeder Agent hat feste Rolle (System Prompt), definierten
+    Tool-/Dateizugriff, definierte Ein- und Ausgabe-Artefakte.
+  layers:
+    - id: task_intake
+      purpose: Aufgaben-Annahme aus GitHub / CLI
+    - id: orchestrator
+      purpose: Dispatch, Gate-Enforcement, Metrik-Schreibung
+    - id: execution
+      purpose: Eigentliche Entwicklungsarbeit (7 Rollen)
+    - id: artifacts
+      purpose: Strukturierte Handoff-Dokumente pro Feature
+    - id: metrics_store
+      purpose: Zeitreihen-Metriken, Kosten, Gates
+    - id: observability
+      purpose: Beobachtung, Analyse, Optimierungsvorschläge
+    - id: notifier
+      purpose: Slack-Kommunikation mit Boris
+
+# -----------------------------------------------------------------------------
+# EXECUTION LAYER – AGENTEN-ROLLEN
+# -----------------------------------------------------------------------------
+execution_agents:
+  - id: orchestrator
+    order: 0
+    role: "Nimmt Aufgabe entgegen, entscheidet Agenten-Reihenfolge, steuert Gates"
+    input: task_from_intake
+    output: task_graph_and_handoffs
+    tools: [dispatch_only]
+    write_access: metrics_only
+    llm_required: false
+    notes: "Python-Service, systemd-managed. Kein eigenes Kontextfenster."
+
+  - id: concept_clarifier
+    order: 1
+    role: "Klärt Anforderung, schreibt TK-Dokument-Entwurf"
+    input: raw_task_from_intake
+    output_artifact: ".pipeline/<feature>/tk-draft.md"
+    tools: [project_knowledge_search, read_repo]
+    write_access: [".pipeline/<feature>/"]
+    model: sonnet_4_5
+    skills: []
+
+  - id: architect_planner
+    order: 2
+    role: "Technischer Umsetzungsplan, Architekturentscheidungen, Risiken"
+    input: ".pipeline/<feature>/tk-draft.md"
+    output_artifact: ".pipeline/<feature>/plan.md"
+    tools: [read_repo]
+    write_access: [".pipeline/<feature>/"]
+    model: sonnet_4_5
+    skills: [review_runner]
+
+  - id: test_designer
+    order: 3
+    role: "Schreibt Test-Spezifikation + fehlschlagende Tests (TDD Red)"
+    input: ".pipeline/<feature>/plan.md"
+    output_artifact: ".pipeline/<feature>/test-plan.md"
+    write_access: ["tests/", ".pipeline/<feature>/"]
+    forbidden_paths: ["!tests/"]
+    model: sonnet_4_5
+    skills: [tdd_red_green]
+    parallelizable_with: [architect_review]
+
+  - id: implementer
+    order: 4
+    role: "Macht Tests grün, implementiert Feature"
+    input: ["plan.md", "red_tests/"]
+    output_artifact: "code_diff + green_tests"
+    write_access: ["src/", "backend/"]
+    forbidden_actions: ["modify_existing_tests_without_flag"]
+    model: sonnet_4_5
+    skills: [tdd_red_green]
+    git_worktree_isolated: true
+
+  - id: security_reviewer
+    order: 5
+    role: "IDOR, RLS, JWT, Secrets, Input-Validation, DSGVO"
+    input: code_diff_from_implementer
+    output_artifact: ".pipeline/<feature>/security-report.md"
+    write_access: [".pipeline/<feature>/"]
+    read_access: [repo_readonly]
+    model: sonnet_4_5
+    skills: [security_checklist]
+    checks:
+      - idor_on_v1_endpoints
+      - rls_policies_on_new_tables
+      - jwt_flow_es256_hs256
+      - secrets_in_code_or_logs
+      - pydantic_input_validation
+      - dsgvo_personal_data_handling
+
+  - id: qa_validator
+    order: 6
+    role: "Code-Review gegen Standards, Coverage, Performance-Regression"
+    input: all_prior_artifacts
+    output_artifact: ".pipeline/<feature>/qa-report.md"
+    write_access: [".pipeline/<feature>/"]
+    read_access: [repo_readonly]
+    model: sonnet_4_5
+    skills: [review_runner]
+    gate_authority: true
+
+  - id: deploy_runner
+    order: 7
+    role: "Staging-Deploy, Smoke-Tests, Prod-Deploy nach manueller Freigabe (L3)"
+    input: qa_gate_passed_signal
+    output: [deploy_log, health_status]
+    tools: [ssh_to_hetzner, systemd_control]
+    write_access: []
+    code_write_access: false
+    isolated_user: true
+    ssh_key_scope: "nur deploy.sh auf Prod-Server"
+    notes: "Separater Linux-User, KEIN Write-Zugriff im Repo."
+
+# -----------------------------------------------------------------------------
+# OBSERVABILITY LAYER – BEOBACHTUNGS-AGENTEN
+# -----------------------------------------------------------------------------
+observability_agents:
+  - id: metrics_collector
+    type: passive
+    llm: false
+    runtime: continuous
+    implementation: "Python-Wrapper um jeden Agent-Call"
+    writes_to: "postgres.pipeline_metrics"
+    schema:
+      - timestamp
+      - feature_id
+      - agent_role
+      - model
+      - tokens_in
+      - tokens_out
+      - cache_read
+      - cost_eur
+      - duration_ms
+      - exit_status
+      - gate_result
+      - diff_loc_added
+      - diff_files_changed
+      - tests_added
+      - coverage_delta
+
+  - id: anomaly_detector
+    type: rule_based
+    llm: false
+    runtime: continuous
+    rules:
+      - trigger: feature_cost_over_2x_median_last_20
+        action: slack_alert + pause_pipeline
+      - trigger: agent_duration_over_3_sigma
+        action: slack_alert
+      - trigger: security_fail_rate_over_30_percent_7d
+        action: slack_alert + flag_for_daily_analyst
+      - trigger: daily_api_budget_over_80_percent
+        action: warning_slack
+      - trigger: daily_api_budget_over_100_percent
+        action: hard_stop_all_pipelines_until_midnight
+
+  - id: daily_analyst
+    type: llm_agent
+    model: haiku_4_5
+    schedule: "systemd timer, daily 06:00 local"
+    input: "24h aggregated metrics + prior day reports"
+    output: "reports/daily/<datum>.md"
+    sections:
+      - what_ran_succeeded_failed
+      - cost_hotspots
+      - anomalies_noted
+      - 1_to_3_improvement_suggestions
+    delivery: slack_plus_optional_email
+    estimated_cost_per_run_eur: 0.02
+    write_access: [reports_read_only_for_others: true]
+
+  - id: weekly_optimizer
+    type: llm_agent
+    model: sonnet_4_5
+    schedule: "systemd timer, Sunday 22:00 local"
+    input:
+      - "7 days of daily reports"
+      - "metrics.pipeline_metrics last 7d"
+      - "current .claude/agents/*.md"
+      - "lessons-learned.db from pattern_learner"
+    output:
+      type: github_pull_request
+      target_repo: agency_repo
+      files_changed: ".claude/agents/*.md"
+      never_merged_autonomously: true
+      must_include:
+        - per_change_rationale_with_metric_evidence
+        - checkbox_list_for_boris
+    estimated_cost_per_run_eur: 0.35
+
+  - id: pattern_learner
+    type: passive
+    llm: false
+    runtime: continuous
+    tracked_signals:
+      - implementer_modifies_test_designer_tests
+      - security_reviewer_repeat_cwe_class
+      - architect_plan_ignored_by_implementer_over_threshold
+    writes_to: "postgres.lessons_learned"
+
+# -----------------------------------------------------------------------------
+# KONTEXT-PERSISTENZ (dreischichtig)
+# -----------------------------------------------------------------------------
+context_layers:
+  A_global:
+    file: CLAUDE.md
+    location: repo_root
+    contents:
+      - stack_and_conventions
+      - non_goals
+      - architectural_decisions
+      - hard_constraints_protected_sections
+    read_by: all_agents
+
+  B_role:
+    files: ".claude/agents/<role>.md"
+    contents_per_file:
+      - system_prompt
+      - allowed_tools
+      - allowed_write_paths
+      - forbidden_actions
+      - output_format_spec
+      - handoff_status_line_format
+    mutation_policy: "nur via Weekly Optimizer PR + manuelles Approval"
+
+  C_work:
+    location: ".pipeline/<feature>/"
+    artifacts:
+      - tk-draft.md
+      - plan.md
+      - test-plan.md
+      - security-report.md
+      - qa-report.md
+    tracked_by: git_feature_branch
+    lifecycle: "created_on_task_intake, archived_on_feature_merge"
+
+# -----------------------------------------------------------------------------
+# HANDOFF-PROTOKOLL
+# -----------------------------------------------------------------------------
+handoff:
+  status_line_format: "STATUS: READY_FOR_<next_agent_id>"
+  status_line_location: "last line of output artifact"
+  gate_check:
+    enforced_by: orchestrator
+    checks:
+      - required_sections_present
+      - status_line_valid
+      - no_forbidden_path_modifications
+      - budget_not_exceeded
+  gate_fail_behavior:
+    action: return_to_responsible_predecessor
+    payload: "findings.md with concrete issues"
+    max_retries_per_agent: 2
+    escalation_after_retries: slack_alert_to_boris
+
+# -----------------------------------------------------------------------------
+# TASK INTAKE
+# -----------------------------------------------------------------------------
+task_intake:
+  primary:
+    mechanism: github_issues_webhook
+    trigger_label: "pipeline:ready"
+    required_issue_fields:
+      - goal
+      - acceptance_criteria
+      - scope
+      - priority
+    status_updates: github_issue_comments
+    result: pull_request_with_closes_reference
+
+  fallback:
+    mechanism: cli
+    command: "agency submit <feature-name>"
+    use_case: local_testing_from_macbook
+
+  granularity_recommendation: per_issue_immediate
+  open_for_decision_id: task_intake_granularity
+
+# -----------------------------------------------------------------------------
+# INFRASTRUKTUR
+# -----------------------------------------------------------------------------
+infrastructure:
+  host:
+    primary: hetzner_cpx22
+    upgrade_path: hetzner_cpx32_if_needed
+    upgrade_triggers:
+      - "> 5 Features parallel"
+      - "Grafana + Timescale dauerhaft aktiv"
+      - "> 15 parallele Agent-Prozesse"
+  os: ubuntu_24_04
+  separate_from_prod: true
+  no_access_to_prod_supabase: true
+  staging_server_optional: hetzner_cpx11
+
+  user_separation:
+    principle: "ein Linux-User pro Agent-Rolle"
+    users:
+      - agent-concept: read_only_repo
+      - agent-architect: read_only_repo
+      - agent-impl: rw_worktree_no_ssh_out
+      - agent-security: read_only_repo
+      - agent-qa: read_only_repo
+      - agent-deploy: ssh_to_prod_only_with_command_constraint
+
+  secrets_management:
+    tool: sops_plus_age
+    reason: "git-tracked verschlüsselt, kein Vault-Server nötig"
+
+  directory_layout:
+    "/opt/agency/":
+      - "repos/falara/ (bare clone)"
+      - "worktrees/<feature>/"
+      - ".pipeline/<feature>/"
+      - ".claude/agents/"
+      - ".claude/skills/"
+      - "reports/daily/"
+      - "reports/weekly/"
+
+# -----------------------------------------------------------------------------
+# SAFETY LAYER
+# -----------------------------------------------------------------------------
+safety:
+  budget_caps:
+    per_feature_eur: 5.00
+    per_day_total_eur: 20.00
+    per_week_total_eur: 100.00
+    enforcement: hard_enforced_no_agent_can_override
+    overrun_behavior:
+      feature: "mark cost_exceeded, abort pipeline"
+      day: "pause task_intake, observers continue"
+      week: "full stop incl observers, manual restart required"
+
+  circuit_breakers:
+    - trigger: 3_consecutive_feature_gate_fails
+      action: pause_pipeline + slack_alert_manual_review_needed
+    - trigger: 2_consecutive_deploy_rollbacks
+      action: disable_deploy_agent + staging_only_mode
+
+  kill_switch:
+    slack_command: "/agency stop"
+    physical: "ssh systemctl stop agency-*"
+
+  hard_constraints_protection:
+    mechanism: pre_commit_hook_in_agency_repo
+    protected_sections_in_claude_md:
+      - deploy_agent_rules
+      - budget_caps
+      - security_checklist_core
+      - dsgvo_processing_rules
+    open_for_decision_id: hard_constraints_list
+
+# -----------------------------------------------------------------------------
+# KOMMUNIKATION (SLACK-ONLY)
+# -----------------------------------------------------------------------------
+communication:
+  primary_channel: slack
+  email_fallback: false
+  slack_workspace_required: true
+  channel_structure_proposal:
+    - "#agency-ops": "Status, Gates, Completions"
+    - "#agency-alerts": "Anomalies, Budget, Circuit Breaker"
+    - "#agency-reports": "Daily Report, Weekly Optimizer PR-Links"
+    - "#agency-commands": "Slash Commands für Kill-Switch, Status-Abfragen"
+
+  slack_integrations:
+    webhooks:
+      - daily_report_to_reports_channel
+      - anomaly_alert_to_alerts_channel
+      - gate_fail_to_ops_channel
+      - pipeline_complete_to_ops_channel
+    slash_commands:
+      - "/agency stop": kill_switch
+      - "/agency status": current_pipeline_state
+      - "/agency pause <feature>": pause_single_feature
+      - "/agency resume <feature>": resume_single_feature
+      - "/agency budget": show_current_budget_consumption
+
+  message_format:
+    use_slack_blocks: true
+    include_feature_id_as_thread_root: true
+    artifact_links: github_permalinks_not_raw_paths
+
+# -----------------------------------------------------------------------------
+# STACK
+# -----------------------------------------------------------------------------
+stack:
+  orchestrator: "Python + APScheduler"
+  task_queue: "Postgres LISTEN/NOTIFY (kein separates Redis)"
+  metrics_store: "Postgres mit Timescale-Extension"
+  scheduler: "systemd timers"
+  notifier: "Slack Webhook + Slash Commands via Bolt-Python"
+  secrets: "sops + age"
+  dashboard_optional: "Grafana gegen Timescale"
+  rationale:
+    - "Ein Datenbank-Dienst für Queue + Metrics reduziert Komplexität"
+    - "systemd statt cron für bessere Logs und Restart-Policy"
+    - "sops statt Vault, weil kein zusätzlicher Dienst nötig"
+
+# -----------------------------------------------------------------------------
+# KOSTEN
+# -----------------------------------------------------------------------------
+costs:
+  infrastructure_monthly_eur:
+    cpx22: 8
+    cpx32_upgrade: 18
+    cpx11_staging_optional: 4
+  observability_api_monthly_eur:
+    metrics_collector: 0.00
+    anomaly_detector: 0.00
+    daily_analyst: 0.60
+    weekly_optimizer: 1.50
+    pattern_learner: 0.00
+    total: 2.10
+  execution_overhead:
+    vs_single_agent_percent: "+20 bis +40"
+    mitigation: "Haiku-Gates und Fast-Lane für kleine Changes"
+
+# -----------------------------------------------------------------------------
+# ROLLOUT-PLAN
+# -----------------------------------------------------------------------------
+rollout:
+  - phase: 1
+    weeks: "1-2"
+    deliverables:
+      - execution_layer_autonomous_L2
+      - github_task_intake
+      - metrics_collector_live
+      - anomaly_detector_live
+    autonomy_level_reached: L2
+  - phase: 2
+    weeks: "3-4"
+    deliverables:
+      - daily_analyst
+      - slack_reporting_full
+      - staging_deploy_autonomous
+    autonomy_level_reached: L3
+  - phase: 3
+    weeks: "5-6"
+    deliverables:
+      - weekly_optimizer_productive
+      - pattern_learner_active
+      - first_optimizer_prs_reviewed_by_boris
+  - phase: 4
+    weeks: "7+"
+    deliverables:
+      - evaluation_optimizer_quality
+      - decision_on_semi_autonomous_merging
+
+# -----------------------------------------------------------------------------
+# OFFENE ENTSCHEIDUNGEN
+# -----------------------------------------------------------------------------
+open_decisions:
+  - id: prod_deploy_strategy
+    question: "Manueller Prod-Deploy (L3) oder Time-Locked Auto-Deploy (L4)?"
+    recommendation: manueller_start_mit_L3
+    required_before: phase_2
+
+  - id: hard_constraints_list
+    question: "Welche CLAUDE.md-Sektionen werden als Hard Constraint markiert?"
+    recommendation: "Siehe safety.hard_constraints_protection.protected_sections_in_claude_md als Startliste"
+    required_before: phase_1
+
+  - id: task_intake_granularity
+    question: "Jedes GitHub-Issue ein Pipeline-Run oder Batching?"
+    recommendation: pro_issue_sofort_wegen_feedback
+    required_before: phase_1
+
+  - id: fast_lane_threshold
+    question: "Ab welchem Diff-Umfang greift der volle Prozess?"
+    recommendation: "> 50 LOC ODER Schema-Change ODER neuer Endpoint"
+    required_before: phase_1
+
+  - id: test_designer_vs_implementer_boundary
+    question: "Darf Implementer Tests ändern?"
+    recommendation: "Nur mit expliziter Begründung im Commit + Gate-Fail-Check"
+    required_before: phase_1
+
+  - id: containerization_vs_linux_users
+    question: "Docker/Podman pro Agent oder nur Linux-User-Trennung?"
+    recommendation: "Linux-User reicht für 7 Rollen; Container später bei Multi-Tenancy"
+    required_before: phase_1
+
+  - id: conductor_replacement_on_remote_host
+    question: "Conductor ist Desktop-Tool (Mac). Welcher CLI-Ersatz auf Server?"
+    recommendation: "git worktree + eigenes Shell-Skript + tmux/screen für Sichtbarkeit"
+    required_before: phase_1
+
+  - id: slack_workspace_selection
+    question: "Eigenes Slack-Workspace für Agency oder bestehendes (Eurotext/Falara)?"
+    recommendation: "Eigenes Workspace oder separater Private Channel in bestehendem Workspace"
+    required_before: phase_2
+
+  - id: reports_persistence
+    question: "Wie lange werden Daily/Weekly Reports aufbewahrt?"
+    recommendation: "12 Monate in Git-Repo, danach archiviert nach S3-kompatiblem Storage"
+    required_before: phase_3
+
+# -----------------------------------------------------------------------------
+# RISIKEN
+# -----------------------------------------------------------------------------
+risks:
+  - id: context_loss_at_handoff
+    mitigation: "Artefakt-Pflichtstrukturen + Gate-Validierung"
+  - id: over_engineering_small_changes
+    mitigation: "Fast-Lane für Bugfixes < 50 LOC, überspringt Concept+Architect"
+  - id: agent_role_drift
+    mitigation: "Rollen-MD versioniert, QA validiert Outputs gegen Rollen-Spec"
+  - id: cost_explosion
+    mitigation: "Harte Budget-Caps, Haiku für Gates, Prompt Caching Pflicht"
+  - id: optimizer_drift
+    mitigation: "Optimizer-PRs niemals auto-merged, Hard Constraints geschützt"
+  - id: single_point_of_failure_agency_host
+    mitigation: "Tägliches Backup von .pipeline/, reports/ und Postgres; Wiederaufbau < 2h"
+
+# -----------------------------------------------------------------------------
+# ALIGNMENT TASKS FÜR CLAUDE CODE
+# -----------------------------------------------------------------------------
+alignment_tasks_for_claude_code:
+  instruction: |
+    Claude Code soll diese Datei als Ausgangspunkt nehmen und folgende
+    Abgleiche durchführen, bevor TK14 v1 geschrieben wird. Jeder Punkt
+    soll als eigener Abschnitt im finalen TK14-Dokument erscheinen.
+
+  tasks:
+    - id: align_with_claude_md
+      action: "Lese CLAUDE.md im Falara-Repo-Root und gleiche ab"
+      check:
+        - "Stimmt der Stack (Supabase, Hetzner, Redis, systemd) überein?"
+        - "Konflikt mit bestehenden Konventionen?"
+        - "Welche Sektionen eignen sich als Hard Constraints?"
+      output: "alignment_report_claude_md.md"
+
+    - id: align_with_user_memories
+      action: "Gleiche gegen userMemories (Anthropic Memory System) ab"
+      check:
+        - "Konsistenz mit TDD-Präferenz (Red-Green-Refactor)"
+        - "Konsistenz mit Implementation-Artifact-Style (Prose vs Bullets)"
+        - "Konsistenz mit session_management (progress.md-Pattern)"
+        - "Konsistenz mit DSGVO-Kompliance-Anforderungen"
+      output: "alignment_report_memories.md"
+
+    - id: align_with_existing_tk_docs
+      action: "Prüfe Überschneidungen mit TK1, TK5, TK7, Skalierungs-Roadmap"
+      check:
+        - "TK1: Ist die Multi-Agent-Produkt-Pipeline klar abgegrenzt?"
+        - "TK5: Sind Security-Boundaries konsistent?"
+        - "TK7: Redis-Queue-Ansatz Produkt vs Postgres-Queue Agency – begründet?"
+        - "Skalierungs-Roadmap: Ressourcen-Annahmen Agency-Host vs Prod-Host"
+      output: "alignment_report_tk_cross_refs.md"
+
+    - id: resolve_open_decisions
+      action: "Für jede open_decisions-Einheit: präsentiere Boris die Frage, hole Entscheidung ein, trage in TK14 v1 ein"
+      output: "decisions_log.md"
+
+    - id: generate_implementation_artifacts
+      action: "Erzeuge konkrete Code/Config-Artefakte für Phase 1"
+      artifacts:
+        - ".claude/agents/*.md (7 Rollen + 5 Observer, 12 Files)"
+        - ".claude/skills/review-runner/"
+        - ".claude/skills/security-checklist/"
+        - ".claude/skills/tdd-red-green/"
+        - "systemd unit files (agency-orchestrator, agency-timers)"
+        - "postgres migrations für pipeline_metrics, lessons_learned, task_queue"
+        - "github webhook receiver (python fastapi)"
+        - "slack bolt app skeleton (slash commands + webhooks)"
+        - "sops secrets structure"
+        - "bootstrap script für Agency-Hetzner-Host"
+
+    - id: tdd_the_orchestrator_itself
+      action: "Orchestrator bekommt TDD-Behandlung: Tests für Gate-Logik, Budget-Enforcement, Handoff-Validierung zuerst"
+      rationale: "Wenn der Orchestrator selbst nicht robust ist, kippt die ganze Agentur"
+
+    - id: validate_against_boris_workflow_principles
+      action: "Prüfe finale TK14 v1 gegen Boris' Workflow-Prinzipien"
+      principles:
+        - "Discuss/align before implementation"
+        - "Structured questions → decision confirmation → implementation prompt"
+        - "Never file downloads for prompts; always copyable text blocks"
+        - "German preferred, concise, decision-oriented"
+
+# -----------------------------------------------------------------------------
+# ENDE
+# -----------------------------------------------------------------------------
