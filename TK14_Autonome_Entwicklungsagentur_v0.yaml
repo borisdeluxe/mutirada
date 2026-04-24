@@ -253,8 +253,12 @@ skills:
         und verhindert, dass Tests vor Implementation gruen sind.
       artifacts:
         - ".claude/skills/tdd-red-green/SKILL.md"
-      status: to_be_created
-      notes: "Basiert auf Boris' TDD-Präferenz aus userMemories"
+      status: created
+      cost_per_run_eur: 0.00
+      notes: |
+        Kein zusaetzlicher LLM-Cost — reiner Workflow-Enforcement.
+        Basiert auf Boris' TDD-Praeferenz aus userMemories.
+        Zwei Phasen: RED (Test Designer) und GREEN (Implementer).
 
     - id: security-checklist
       type: rigid
@@ -266,7 +270,18 @@ skills:
       artifacts:
         - ".claude/skills/security-checklist/SKILL.md"
         - ".claude/skills/security-checklist/prompts/checklist.md"
-      status: to_be_created
+      status: created
+      cost_per_run_eur: 0.05-0.10
+      cwe_coverage:
+        - "CWE-639 (IDOR)"
+        - "CWE-306 (Missing Auth)"
+        - "CWE-284 (Broken Access Control)"
+        - "CWE-89 (SQL Injection)"
+        - "CWE-79 (XSS)"
+        - "CWE-798 (Hardcoded Credentials)"
+        - "CWE-532 (Sensitive Data in Logs)"
+        - "CWE-20 (Input Validation)"
+        - "CWE-347 (Insecure JWT)"
       checks:
         - idor_on_v1_endpoints
         - rls_policies_on_new_tables
