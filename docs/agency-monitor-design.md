@@ -2,13 +2,13 @@
 
 **Date:** 2026-04-24
 **Status:** Draft
-**Scope:** Live Agent-Monitoring Dashboard für Pluribus Agency
+**Scope:** Live Agent-Monitoring Dashboard für mutirada Agency
 
 ---
 
 ## 1. Overview
 
-Lightweight Monitoring-Dashboard für die Pluribus Agency. Zeigt live, was die Agenten tun, welche Features in der Pipeline sind, und den aktuellen System-Status.
+Lightweight Monitoring-Dashboard für die mutirada Agency. Zeigt live, was die Agenten tun, welche Features in der Pipeline sind, und den aktuellen System-Status.
 
 ### Goals
 

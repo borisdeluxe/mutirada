@@ -555,7 +555,7 @@ infrastructure:
     primary: hetzner_cx43
     specs: "8 vCPU, 16GB RAM, 160GB SSD, €11.99/mo"
     ip: "46.225.19.209"
-    hostname: "pluribus-16gb-nbg1-1"
+    hostname: "mutirada-16gb-nbg1-1"
     domain: "agency.falara.io"
     upgrade_path: hetzner_cx53_if_needed
     upgrade_triggers:

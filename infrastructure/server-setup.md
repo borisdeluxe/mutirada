@@ -3,7 +3,7 @@
 **Server:** Hetzner cx43 (8 vCPU, 16GB RAM, 160GB SSD)
 **IP:** 46.225.19.209
 **OS:** Ubuntu 24.04.3 LTS
-**Hostname:** pluribus-16gb-nbg1-1
+**Hostname:** mutirada-16gb-nbg1-1
 
 ## Installed Packages
 
@@ -74,7 +74,7 @@ Stored in `/opt/agency/.env`:
 - [x] Caddy configuration (Caddyfile)
 - [x] Claude CLI (v2.1.119)
 - [x] Firewall (ufw: 22, 80, 443)
-- [x] SSH key for GitHub (agency@pluribus)
+- [x] SSH key for GitHub (agency@mutirada)
 
 ## Pending
 
@@ -86,7 +86,7 @@ Stored in `/opt/agency/.env`:
 ## SSH Key for GitHub
 
 ```
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGvicg5kp3j+luvD70IDP/f0j5e9tSNodIR3GMDxtGgk agency@pluribus
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKwPT0Kc9kstBh887hmDJdOCVb6Vw8KT+hJe6iHOnZQC agency@mutirada
 ```
 
 Add this as **deploy key** to `borisdeluxe/falara` (read-only) or as SSH key to your GitHub account.
