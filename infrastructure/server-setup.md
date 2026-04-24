@@ -69,10 +69,24 @@ Stored in `/opt/agency/.env`:
 - `DATABASE_URL` — Postgres connection string
 - `AGENCY_MONITOR_SECRET` — Dashboard auth token
 
+## Completed
+
+- [x] Caddy configuration (Caddyfile)
+- [x] Claude CLI (v2.1.119)
+- [x] Firewall (ufw: 22, 80, 443)
+- [x] SSH key for GitHub (agency@pluribus)
+
 ## Pending
 
-- [ ] Caddy configuration (HTTPS)
-- [ ] Claude CLI installation
-- [ ] Firewall rules
-- [ ] systemd services
 - [ ] DNS: agency.falara.io → 46.225.19.209
+- [ ] Add SSH key to GitHub as deploy key
+- [ ] systemd services (orchestrator, monitor-api)
+- [ ] Clone falara repo
+
+## SSH Key for GitHub
+
+```
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGvicg5kp3j+luvD70IDP/f0j5e9tSNodIR3GMDxtGgk agency@pluribus
+```
+
+Add this as **deploy key** to `borisdeluxe/falara` (read-only) or as SSH key to your GitHub account.

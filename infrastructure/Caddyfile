@@ -1,0 +1,27 @@
+# Agency Monitor
+agency.falara.io {
+    # Static files
+    root * /opt/agency/monitor/static
+    file_server
+
+    # API proxy
+    handle /api/* {
+        reverse_proxy localhost:8080
+    }
+
+    # Security headers
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+    }
+}
+
+# Direct IP access (for testing before DNS)
+:80 {
+    root * /opt/agency/monitor/static
+    file_server
+
+    handle /api/* {
+        reverse_proxy localhost:8080
+    }
+}
