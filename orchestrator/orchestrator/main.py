@@ -202,7 +202,36 @@ class Orchestrator:
         """Main loop - process tasks and check sessions."""
         import time
 
+        print(f"Orchestrator starting, polling every {interval}s...")
         while True:
-            self.process_one()
-            self.check_active_sessions()
+            try:
+                processed = self.process_one()
+                if processed:
+                    print(f"Processed task")
+                self.check_active_sessions()
+            except Exception as e:
+                print(f"Error in loop: {e}")
             time.sleep(interval)
+
+
+def main():
+    """Entry point for orchestrator service."""
+    import os
+    import psycopg
+    from psycopg.rows import dict_row
+
+    db_url = os.environ.get(
+        'DATABASE_URL',
+        'postgresql://agency:agency@localhost:5432/agency_db'
+    )
+
+    print(f"Connecting to database...")
+    db = psycopg.connect(db_url, row_factory=dict_row)
+    print(f"Connected. Starting orchestrator...")
+
+    orch = Orchestrator(db=db)
+    orch.run_loop(interval=30)
+
+
+if __name__ == '__main__':
+    main()
