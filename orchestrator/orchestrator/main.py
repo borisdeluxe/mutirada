@@ -29,6 +29,7 @@ class Orchestrator:
         "implementer",
         "security_reviewer",
         "qa_validator",
+        "docs_updater",
         "deploy_runner",
     ]
 
@@ -41,6 +42,7 @@ class Orchestrator:
         "implementer": "implementation.md",
         "security_reviewer": "security-report.md",
         "qa_validator": "qa-report.md",
+        "docs_updater": "docs-report.md",
         "deploy_runner": "deploy-log.md",
     }
 

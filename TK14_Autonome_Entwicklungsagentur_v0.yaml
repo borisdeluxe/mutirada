@@ -110,13 +110,16 @@ execution_agents:
 
   - id: concept_clarifier
     order: 1
-    role: "Klärt Anforderung, schreibt TK-Dokument-Entwurf"
+    role: "Prüft bestehenden Code, klärt Anforderung, schreibt TK-Dokument-Entwurf"
     input: raw_task_from_intake
     output_artifact: ".pipeline/<feature>/tk-draft.md"
-    tools: [project_knowledge_search, read_repo]
+    tools: [project_knowledge_search, read_repo, grep, find]
     write_access: [".pipeline/<feature>/"]
     model: sonnet_4_5
-    skills: []
+    skills: [brainstorming]
+    mandatory_first_step: "Search existing code for overlap before any design work"
+    user_interaction: true
+    notes: "MUSS bestehende Implementierung prüfen und User fragen: extend/refactor/rewrite"
 
   - id: architect_planner
     order: 2
@@ -175,12 +178,28 @@ execution_agents:
     write_access: [".pipeline/<feature>/"]
     read_access: [repo_readonly]
     model: sonnet_4_5
-    skills: [code_review]
+    skills: [code_review, verification]
     gate_authority: true
     notes: "Nutzt code-review Skill (nicht review-runner). Code-Review ist spezialisiert auf Diffs, Coverage, Regressions."
 
-  - id: deploy_runner
+  - id: docs_updater
     order: 7
+    role: "Aktualisiert öffentliche Dokumentation (API Docs, Changelog)"
+    input: [code_diff, qa_report]
+    output_artifact: "docs/ changes + .pipeline/<feature>/docs-report.md"
+    write_access: ["docs/", ".pipeline/<feature>/"]
+    read_access: [repo_readonly]
+    model: sonnet_4_5
+    skills: [docs_update]
+    security_gate: true
+    notes: "NIEMALS Admin/Internal APIs dokumentieren. Security-Klassifikation vor jedem Doc-Update."
+    falara_specific:
+      docs_repo: "falara-api-docs"
+      public_endpoints_only: ["/v1/*"]
+      never_document: ["/admin/*", "/internal/*", "database schemas", "provider configs"]
+
+  - id: deploy_runner
+    order: 8
     role: "Staging-Deploy, Smoke-Tests, Prod-Deploy nach manueller Freigabe (L3)"
     input: qa_gate_passed_signal
     output: [deploy_log, health_status]

@@ -37,6 +37,7 @@ class GateValidator:
         "implementer",
         "security_reviewer",
         "qa_validator",
+        "docs_updater",
         "deploy_runner",
     ]
 
@@ -48,6 +49,7 @@ class GateValidator:
         "IMPLEMENTER": "implementer",
         "SECURITY_REVIEWER": "security_reviewer",
         "QA_VALIDATOR": "qa_validator",
+        "DOCS_UPDATER": "docs_updater",
         "DEPLOY_RUNNER": "deploy_runner",
     }
 
