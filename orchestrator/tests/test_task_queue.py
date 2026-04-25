@@ -100,16 +100,20 @@ class TestTaskQueue:
 @pytest.fixture
 def task_queue(test_db):
     """Task queue with test tasks."""
-    queue = TaskQueue(test_db)
-    # Insert test tasks
-    test_db.execute("""
-        INSERT INTO agency_tasks (feature_id, source, status, created_at)
-        VALUES
-            ('FAL-001', 'test', 'pending', NOW() - INTERVAL '2 hours'),
-            ('FAL-002', 'test', 'pending', NOW() - INTERVAL '1 hour'),
-            ('FAL-003', 'test', 'in_progress', NOW())
-    """)
-    return queue
+    # Add test tasks using helper (works with both real DB and InMemoryDB)
+    if hasattr(test_db, 'add_task'):
+        test_db.add_task('FAL-001', status='pending')
+        test_db.add_task('FAL-002', status='pending')
+        test_db.add_task('FAL-003', status='in_progress')
+    else:
+        test_db.execute("""
+            INSERT INTO agency_tasks (feature_id, source, status, created_at)
+            VALUES
+                ('FAL-001', 'test', 'pending', NOW() - INTERVAL '2 hours'),
+                ('FAL-002', 'test', 'pending', NOW() - INTERVAL '1 hour'),
+                ('FAL-003', 'test', 'in_progress', NOW())
+        """)
+    return TaskQueue(test_db)
 
 
 @pytest.fixture

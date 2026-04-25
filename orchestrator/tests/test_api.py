@@ -147,3 +147,13 @@ class TestHealthEndpoint:
 def client():
     """FastAPI test client."""
     return TestClient(app)
+
+
+@pytest.fixture
+def mock_db():
+    """Mock database connection."""
+    mock = MagicMock()
+    mock.__enter__ = MagicMock(return_value=mock)
+    mock.__exit__ = MagicMock(return_value=False)
+    mock.commit = MagicMock()
+    return mock

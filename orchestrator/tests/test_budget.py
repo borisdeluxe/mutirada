@@ -70,7 +70,7 @@ class TestBudgetEnforcer:
             "SELECT cost_eur FROM agency_tasks WHERE feature_id = 'FAL-001'"
         ).fetchone()
 
-        assert result["cost_eur"] == Decimal("5.80")
+        assert float(result["cost_eur"]) == pytest.approx(5.80, rel=1e-6)
 
     def test_get_budget_summary_returns_all_levels(self, budget: BudgetEnforcer):
         """Should return current spend and limits for all levels."""
@@ -101,50 +101,66 @@ class TestBudgetLimits:
 @pytest.fixture
 def budget(test_db):
     """Budget enforcer with test data under limits."""
-    # Insert test cost data
-    test_db.execute("""
-        INSERT INTO agency_tasks (feature_id, source, status, cost_eur, created_at)
-        VALUES
-            ('FAL-001', 'test', 'completed', 5.00, NOW()),
-            ('FAL-002', 'test', 'completed', 8.00, NOW())
-    """)
+    if hasattr(test_db, 'add_task'):
+        test_db.add_task('FAL-001', status='completed', cost_eur=5.00)
+        test_db.add_task('FAL-002', status='completed', cost_eur=8.00)
+    else:
+        test_db.execute("""
+            INSERT INTO agency_tasks (feature_id, source, status, cost_eur, created_at)
+            VALUES
+                ('FAL-001', 'test', 'completed', 5.00, NOW()),
+                ('FAL-002', 'test', 'completed', 8.00, NOW())
+        """)
     return BudgetEnforcer(test_db)
 
 
 @pytest.fixture
 def budget_near_daily_limit(test_db):
     """Budget enforcer with daily limit nearly exceeded (19.50 of 20.00)."""
-    test_db.execute("""
-        INSERT INTO agency_tasks (feature_id, source, status, cost_eur, created_at)
-        VALUES
-            ('FAL-001', 'test', 'completed', 10.00, NOW()),
-            ('FAL-002', 'test', 'completed', 9.50, NOW())
-    """)
+    if hasattr(test_db, 'add_task'):
+        test_db.add_task('FAL-001', status='completed', cost_eur=10.00)
+        test_db.add_task('FAL-002', status='completed', cost_eur=9.50)
+    else:
+        test_db.execute("""
+            INSERT INTO agency_tasks (feature_id, source, status, cost_eur, created_at)
+            VALUES
+                ('FAL-001', 'test', 'completed', 10.00, NOW()),
+                ('FAL-002', 'test', 'completed', 9.50, NOW())
+        """)
     return BudgetEnforcer(test_db)
 
 
 @pytest.fixture
 def budget_over_daily_limit(test_db):
     """Budget enforcer with daily limit exceeded (20.50 of 20.00)."""
-    test_db.execute("""
-        INSERT INTO agency_tasks (feature_id, source, status, cost_eur, created_at)
-        VALUES
-            ('FAL-001', 'test', 'completed', 10.50, NOW()),
-            ('FAL-002', 'test', 'completed', 10.00, NOW())
-    """)
+    if hasattr(test_db, 'add_task'):
+        test_db.add_task('FAL-001', status='completed', cost_eur=10.50)
+        test_db.add_task('FAL-002', status='completed', cost_eur=10.00)
+    else:
+        test_db.execute("""
+            INSERT INTO agency_tasks (feature_id, source, status, cost_eur, created_at)
+            VALUES
+                ('FAL-001', 'test', 'completed', 10.50, NOW()),
+                ('FAL-002', 'test', 'completed', 10.00, NOW())
+        """)
     return BudgetEnforcer(test_db)
 
 
 @pytest.fixture
 def budget_with_room(test_db):
     """Budget enforcer with room for spending on FAL-003."""
-    test_db.execute("""
-        INSERT INTO agency_tasks (feature_id, source, status, cost_eur, created_at)
-        VALUES
-            ('FAL-001', 'test', 'completed', 2.00, NOW()),
-            ('FAL-002', 'test', 'completed', 3.00, NOW()),
-            ('FAL-003', 'test', 'pending', 1.00, NOW())
-    """)
+    if hasattr(test_db, 'add_task'):
+        test_db.add_task('FAL-001', status='completed', cost_eur=2.00)
+        test_db.add_task('FAL-002', status='completed', cost_eur=3.00)
+        test_db.add_task('FAL-003', status='pending', cost_eur=1.00)
+    else:
+        test_db.execute("""
+            INSERT INTO agency_tasks (feature_id, source, status, cost_eur, created_at)
+            VALUES
+                ('FAL-001', 'test', 'completed', 2.00, NOW()),
+                ('FAL-002', 'test', 'completed', 3.00, NOW()),
+                ('FAL-003', 'test', 'pending', 1.00, NOW())
+        """)
     return BudgetEnforcer(test_db)
 
 
