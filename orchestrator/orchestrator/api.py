@@ -1,12 +1,13 @@
 """Task submission API - enables any Claude to submit tasks via HTTP."""
 import json
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Header, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 import psycopg
 from psycopg.rows import dict_row
 
@@ -15,7 +16,13 @@ app = FastAPI(title="Mutirada Agency API", version="1.0.0")
 
 PIPELINE_DIR = Path(os.environ.get('AGENCY_PIPELINE_DIR', '/opt/agency/.pipeline'))
 DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://agency:agency@localhost:5432/agency_db')
-API_SECRET = os.environ.get('AGENCY_API_SECRET', 'dev-secret-change-me')
+
+_api_secret = os.environ.get('AGENCY_API_SECRET')
+if _api_secret is None:
+    raise ValueError("AGENCY_API_SECRET environment variable must be set")
+API_SECRET = _api_secret
+
+FEATURE_ID_PATTERN = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$')
 
 
 def get_db():
@@ -36,12 +43,32 @@ def generate_feature_id(prefix: str = "API") -> str:
     return f"{prefix}-{timestamp}"
 
 
+def validate_feature_id(value: Optional[str]) -> Optional[str]:
+    """Validate feature_id to prevent path traversal and injection."""
+    if value is None:
+        return None
+    if '\x00' in value:
+        raise ValueError("feature_id contains invalid characters")
+    if value.startswith('/'):
+        raise ValueError("feature_id cannot be an absolute path")
+    if '..' in value:
+        raise ValueError("feature_id cannot contain path traversal")
+    if not FEATURE_ID_PATTERN.match(value):
+        raise ValueError("feature_id must be alphanumeric with dashes/underscores")
+    return value
+
+
 class TaskSubmit(BaseModel):
     """Task submission request."""
     title: str
     body: str = ""
     feature_id: Optional[str] = None
     priority: int = 0
+
+    @field_validator('feature_id')
+    @classmethod
+    def check_feature_id(cls, v):
+        return validate_feature_id(v)
 
 
 class ReviewSubmit(BaseModel):

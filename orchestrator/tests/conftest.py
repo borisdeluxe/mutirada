@@ -252,3 +252,18 @@ def test_db(db_url):
 def mock_db():
     """Always returns a mock database for pure unit tests."""
     return MockDB()
+
+
+@pytest.fixture(scope="function")
+def api_client():
+    """FastAPI test client for API tests."""
+    from fastapi.testclient import TestClient
+    from orchestrator.api import app
+    return TestClient(app)
+
+
+@pytest.fixture(scope="function")
+def api_secret():
+    """Get the API secret from the loaded module."""
+    from orchestrator.api import API_SECRET
+    return API_SECRET
