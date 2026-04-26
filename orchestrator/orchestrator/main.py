@@ -1,4 +1,5 @@
 """Orchestrator main loop - dispatches tasks to agents and enforces gates."""
+import shlex
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -113,17 +114,19 @@ class Orchestrator:
         # Read input content for prompt
         input_content = ""
         if input_file.exists():
-            input_content = input_file.read_text().replace("'", "'\\''")
+            input_content = input_file.read_text()
 
         # Claude Code invocation:
         # --agent loads from ~/.claude/agents/<agent>.md
         # -p for non-interactive print mode
         # --dangerously-skip-permissions for automation
+        # Use shlex.quote for shell-safe escaping of user content
+        quoted_content = shlex.quote(input_content)
         claude_cmd = (
             f"cd {repo_dir} && "
             f"claude --agent {agent} -p "
             f"--dangerously-skip-permissions "
-            f"'{input_content}' "
+            f"{quoted_content} "
             f"> {output_path} 2>&1; "
             f"echo 'STATUS: Agent {agent} completed' >> {output_path}"
         )
